@@ -1,13 +1,20 @@
 [Unit]
 Description=HP Wireless Keyboard Hacked Driver
-After=network.target
+# Wait for udev so USB devices (and usbmon) are ready before we start.
+After=systemd-udevd.service
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/
 ExecStart=/bin/bash /usr/local/bin/hp_keyboard.sh
-Restart=on-abort
+# Restart on any failure (non-zero exit or signal), not just abnormal aborts.
+Restart=on-failure
+RestartSec=5
+# Send output to the journal so failures are diagnosable via `journalctl -u hp_keyboard`.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hp_keyboard
 
 [Install]
 WantedBy=multi-user.target
