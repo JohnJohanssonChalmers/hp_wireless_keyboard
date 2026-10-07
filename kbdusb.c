@@ -336,6 +336,10 @@ int main() {
   /* usb_reset(lenovo_combo); */
   struct input_event ev;
   const int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK | O_DSYNC);
+  if (fd < 0) {
+    perror("open /dev/uinput");
+    return 1;
+  }
   ret = ioctl(fd, UI_SET_EVBIT, EV_KEY);
   ret = ioctl(fd, UI_SET_EVBIT, EV_SYN);
   ret = ioctl(fd, UI_SET_KEYBIT, KEY_A); /* Auth KEY_A */
@@ -454,11 +458,19 @@ int main() {
   uidev.id.version = 1;
   ret = write(fd, &uidev, sizeof(uidev));
   ret = ioctl(fd, UI_DEV_CREATE);
+  if (ret < 0) {
+    perror("ioctl UI_DEV_CREATE");
+    return 1;
+  }
   if (DEBUG) printf("uinput all set\n");
 
   memset(&buffer, 0, 80);
   FILE *in;
   in = fopen("/dev/stdin", "r");
+  if (!in) {
+    perror("fopen /dev/stdin");
+    return 1;
+  }
   if (DEBUG) printf("stdin is open\n");
 
   int bytes_read;
@@ -467,7 +479,7 @@ int main() {
     if (DEBUG) printf("read: %s", buffer);
     char bytes_reported[2];
     strncpy(bytes_reported, buffer, 1);
-    bytes_reported[2] = 0;
+    bytes_reported[1] = 0; /* null-terminate (strncpy with n=1 does not) */
     int ibytes_reported = atoi(bytes_reported);
 
     if (DEBUG) printf("Num bytes reported: %i\n", ibytes_reported);
@@ -637,11 +649,14 @@ int main() {
           }
           if (j == 8) {
             /* key is released */
-            memset(&ev, 0, sizeof(ev));
-            ev.type = EV_KEY;
-            ev.value = 0;
-            ev.code = mapkey(keypressed_prec[i]);
-            ret = write(fd, &ev, sizeof(ev));
+            int code = mapkey(keypressed_prec[i]);
+            if (code != 0) { /* skip unmapped keys (0 == KEY_0) */
+              memset(&ev, 0, sizeof(ev));
+              ev.type = EV_KEY;
+              ev.value = 0;
+              ev.code = code;
+              ret = write(fd, &ev, sizeof(ev));
+            }
           }
         }
         if (keypressed[i] != 0) {
@@ -651,11 +666,14 @@ int main() {
           }
           if (j == 8) {
             /* key is newly pressed */
-            memset(&ev, 0, sizeof(ev));
-            ev.type = EV_KEY;
-            ev.value = 1;
-            ev.code = mapkey(keypressed[i]);
-            ret = write(fd, &ev, sizeof(ev));
+            int code = mapkey(keypressed[i]);
+            if (code != 0) { /* skip unmapped keys (0 == KEY_0) */
+              memset(&ev, 0, sizeof(ev));
+              ev.type = EV_KEY;
+              ev.value = 1;
+              ev.code = code;
+              ret = write(fd, &ev, sizeof(ev));
+            }
           }
         }
       }
